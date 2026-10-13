@@ -125,7 +125,7 @@ h2 { margin: 0; font-family: var(--display); font-size: 20px; color: var(--sun);
     <button class="btn" id="playBtn">PLAY</button>
     <p class="how" id="howTouch">Thumb <kbd>◀ ▶</kbd> to move · <kbd>A</kbd> to jump (hold it to jump higher) · hold <kbd>B</kbd> to run, tap it to throw fire.</p>
     <p class="how" id="howKeys">Keyboard: <kbd>←→</kbd> move · <kbd>SPACE</kbd> jump · <kbd>X</kbd> or <kbd>LEFT CLICK</kbd> run &amp; fire · <kbd>P</kbd> pause · <kbd>M</kbd> sound</p>
-    <div class="row"><button class="btn alt" id="soundBtn1">SOUND: ON</button></div>
+    <div class="row"><button class="btn alt" id="fsBtn1">FULL SCREEN</button><button class="btn alt" id="soundBtn1">SOUND: ON</button></div>
     <p class="how" id="bestLine"></p>
   </div>
 </div>
@@ -136,6 +136,7 @@ h2 { margin: 0; font-family: var(--display); font-size: 20px; color: var(--sun);
     <button class="btn" id="resumeBtn">RESUME</button>
     <div class="row">
       <button class="btn alt" id="restartBtn">RESTART WORLD</button>
+      <button class="btn alt" id="fsBtn2">FULL SCREEN</button>
       <button class="btn alt" id="soundBtn2">SOUND: ON</button>
       <button class="btn alt" id="quitBtn">TITLE</button>
     </div>
@@ -1224,9 +1225,10 @@ document.addEventListener('pointerdown', e => {
   if (e.pointerType !== 'mouse' || e.button !== 0) return;
   if (e.target.closest && e.target.closest('.overlay, #pauseBtn')) return;
   e.preventDefault(); initAudio(); tapFlag = true; mouseB = true; mouseClick = true;
+  if (state === 'play' || state === 'intro') lockPointer();
 });
 addEventListener('pointerup', e => { if (e.pointerType === 'mouse' && e.button === 0) mouseB = false; });
-addEventListener('blur', () => { mouseB = false; });
+addEventListener('blur', () => { mouseB = false; if (!paused && (state === 'play' || state === 'intro')) togglePause(); });
 const endPtr = e => { ptrs.delete(e.pointerId); syncTouch(); };
 touchEl.addEventListener('pointerup', endPtr);
 touchEl.addEventListener('pointercancel', endPtr);
@@ -1242,7 +1244,7 @@ function showOnly(id) {
   const playing = id === null;
   touchEl.hidden = !(playing && isTouch);
   $('pauseBtn').hidden = !playing;
-  if (!playing) { ptrs.clear(); syncTouch(); }
+  if (!playing) { ptrs.clear(); syncTouch(); unlockPointer(); }
 }
 function renderMenu() {
   const names = ['Sunny Meadow', 'Crystal Caverns', 'Lava Keep'];
@@ -1260,15 +1262,44 @@ function renderMenu() {
 function togglePause() {
   if (state === 'title' || state === 'over' || state === 'won') return;
   paused = !paused;
-  if (paused) { if (AC) AC.suspend(); showOnly('pauseMenu'); keys.left = keys.right = keys.jump = keys.b = false; mouseB = false; }
-  else { if (AC) AC.resume(); showOnly(null); }
+  if (paused) { if (AC) AC.suspend(); showOnly('pauseMenu'); keys.left = keys.right = keys.jump = keys.b = false; mouseB = false; unlockPointer(); }
+  else { if (AC) AC.resume(); showOnly(null); immerse(); }
 }
-$('playBtn').addEventListener('click', () => startGame(selWorld));
+
+/* full screen + pointer lock, so stray clicks can't leave the game.
+   Both are optional: some browsers and app views refuse them. */
+const docEl = document.documentElement;
+const fsSupported = !!(docEl.requestFullscreen || docEl.webkitRequestFullscreen);
+let hasMouse = matchMedia('(any-pointer: fine)').matches;
+const isFull = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+function goFullscreen() {
+  if (!fsSupported || isFull()) return;
+  try { const r = (docEl.requestFullscreen || docEl.webkitRequestFullscreen).call(docEl); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+}
+function exitFullscreen() {
+  try { const r = (document.exitFullscreen || document.webkitExitFullscreen).call(document); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+}
+function lockPointer() {
+  if (!hasMouse || !cv.requestPointerLock || document.pointerLockElement === cv) return;
+  try { const r = cv.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) {}
+}
+function unlockPointer() { if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock(); }
+function immerse() { goFullscreen(); lockPointer(); }
+document.addEventListener('pointerlockchange', () => {
+  if (!document.pointerLockElement && !paused && (state === 'play' || state === 'intro')) togglePause();
+});
+function syncFsButtons() { ['fsBtn1', 'fsBtn2'].forEach(id => { $(id).hidden = !fsSupported; $(id).textContent = isFull() ? 'EXIT FULL SCREEN' : 'FULL SCREEN'; }); }
+document.addEventListener('fullscreenchange', syncFsButtons);
+document.addEventListener('webkitfullscreenchange', syncFsButtons);
+['fsBtn1', 'fsBtn2'].forEach(id => $(id).addEventListener('click', () => { if (isFull()) exitFullscreen(); else goFullscreen(); }));
+syncFsButtons();
+document.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') hasMouse = true; }, true);
+$('playBtn').addEventListener('click', () => { immerse(); startGame(selWorld); });
 $('pauseBtn').addEventListener('click', togglePause);
 $('resumeBtn').addEventListener('click', togglePause);
 $('restartBtn').addEventListener('click', () => { paused = false; if (AC) AC.resume(); stopSong(); P.form = 0; checkpointX = null; beginLevel(false); });
 $('quitBtn').addEventListener('click', toTitle);
-$('retryBtn').addEventListener('click', () => { lives = 5; score = 0; coins = 0; checkpointX = null; P.form = 0; initAudio(); beginLevel(false); });
+$('retryBtn').addEventListener('click', () => { immerse(); lives = 5; score = 0; coins = 0; checkpointX = null; P.form = 0; initAudio(); beginLevel(false); });
 $('overTitleBtn').addEventListener('click', toTitle);
 $('againBtn').addEventListener('click', () => { selWorld = 0; toTitle(); });
 ['soundBtn1', 'soundBtn2'].forEach(id => $(id).addEventListener('click', () => { initAudio(); setMuted(!muted); }));

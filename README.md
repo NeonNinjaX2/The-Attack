@@ -29,3 +29,4 @@ Everything is in a single file, `index.html`. There are no dependencies and no b
 - Checkpoint flags mid-level, a 1-up every 100 coins, and stomp combos
 - Chiptune music and sound effects generated live with Web Audio (on iPad, sound needs the silent switch off)
 - Worlds unlock as you clear them, and your best score is saved on the device
+- Goes full screen and captures the mouse when you press Play; press Esc to get the cursor back. If the game loses focus it pauses itself
