@@ -124,7 +124,7 @@ h2 { margin: 0; font-family: var(--display); font-size: 20px; color: var(--sun);
     <div class="worlds" id="worlds"></div>
     <button class="btn" id="playBtn">PLAY</button>
     <p class="how" id="howTouch">Thumb <kbd>◀ ▶</kbd> to move · <kbd>A</kbd> to jump (hold it to jump higher) · hold <kbd>B</kbd> to run, tap it to throw fire.</p>
-    <p class="how" id="howKeys">Keyboard: <kbd>←→</kbd> move · <kbd>SPACE</kbd> jump · <kbd>X</kbd> run &amp; fire · <kbd>P</kbd> pause · <kbd>M</kbd> sound</p>
+    <p class="how" id="howKeys">Keyboard: <kbd>←→</kbd> move · <kbd>SPACE</kbd> jump · <kbd>X</kbd> or <kbd>LEFT CLICK</kbd> run &amp; fire · <kbd>P</kbd> pause · <kbd>M</kbd> sound</p>
     <div class="row"><button class="btn alt" id="soundBtn1">SOUND: ON</button></div>
     <p class="how" id="bestLine"></p>
   </div>
@@ -1178,12 +1178,13 @@ function render() {
 /* ================= input ================= */
 const input = { left: false, right: false, jump: false, b: false, jumpP: false, bP: false, tap: false };
 const keys = { left: false, right: false, jump: false, b: false };
+let mouseB = false, mouseClick = false; // left mouse button acts as B: hold to run, click to throw fire
 const touchHeld = { left: false, right: false, jump: false, b: false };
 let prevJump = false, prevB = false, tapFlag = false;
 function readInput() {
   input.left = keys.left || touchHeld.left; input.right = keys.right || touchHeld.right;
-  input.jump = keys.jump || touchHeld.jump; input.b = keys.b || touchHeld.b;
-  input.jumpP = input.jump && !prevJump; input.bP = input.b && !prevB;
+  input.jump = keys.jump || touchHeld.jump; input.b = keys.b || touchHeld.b || mouseB;
+  input.jumpP = input.jump && !prevJump; input.bP = (input.b && !prevB) || mouseClick; mouseClick = false;
   prevJump = input.jump; prevB = input.b;
   input.tap = tapFlag; tapFlag = false;
 }
@@ -1217,8 +1218,15 @@ function syncTouch() {
   btnA.classList.toggle('on', touchHeld.jump);
   btnB.classList.toggle('on', touchHeld.b);
 }
-touchEl.addEventListener('pointerdown', e => { e.preventDefault(); initAudio(); tapFlag = true; try { touchEl.setPointerCapture(e.pointerId); } catch (_) {} ptrs.set(e.pointerId, zoneAt(e.clientX, e.clientY)); syncTouch(); });
+touchEl.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') return; e.preventDefault(); initAudio(); tapFlag = true; try { touchEl.setPointerCapture(e.pointerId); } catch (_) {} ptrs.set(e.pointerId, zoneAt(e.clientX, e.clientY)); syncTouch(); });
 touchEl.addEventListener('pointermove', e => { if (!ptrs.has(e.pointerId)) return; e.preventDefault(); ptrs.set(e.pointerId, zoneAt(e.clientX, e.clientY)); syncTouch(); });
+document.addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'mouse' || e.button !== 0) return;
+  if (e.target.closest && e.target.closest('.overlay, #pauseBtn')) return;
+  e.preventDefault(); initAudio(); tapFlag = true; mouseB = true; mouseClick = true;
+});
+addEventListener('pointerup', e => { if (e.pointerType === 'mouse' && e.button === 0) mouseB = false; });
+addEventListener('blur', () => { mouseB = false; });
 const endPtr = e => { ptrs.delete(e.pointerId); syncTouch(); };
 touchEl.addEventListener('pointerup', endPtr);
 touchEl.addEventListener('pointercancel', endPtr);
@@ -1247,12 +1255,12 @@ function renderMenu() {
     box.appendChild(b);
   });
   $('bestLine').textContent = best > 0 ? 'Best score: ' + best : '';
-  $('howTouch').hidden = !isTouch; $('howKeys').hidden = isTouch;
+  $('howTouch').hidden = !isTouch; $('howKeys').hidden = false;
 }
 function togglePause() {
   if (state === 'title' || state === 'over' || state === 'won') return;
   paused = !paused;
-  if (paused) { if (AC) AC.suspend(); showOnly('pauseMenu'); keys.left = keys.right = keys.jump = keys.b = false; }
+  if (paused) { if (AC) AC.suspend(); showOnly('pauseMenu'); keys.left = keys.right = keys.jump = keys.b = false; mouseB = false; }
   else { if (AC) AC.resume(); showOnly(null); }
 }
 $('playBtn').addEventListener('click', () => startGame(selWorld));

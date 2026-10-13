@@ -17,7 +17,7 @@ Everything is in a single file, `index.html`. There are no dependencies and no b
 | --- | --- | --- |
 | Move | ◀ ▶ pad (bottom left) | ← → or A D |
 | Jump (hold for higher) | **A** | Space, ↑, W or Z |
-| Run / throw fire | **B** (hold to run, tap to throw) | X or Shift |
+| Run / throw fire | **B** (hold to run, tap to throw) | X, Shift or left mouse click |
 | Pause | ⏸ top right | P or Esc |
 | Sound on/off | Pause menu | M |
 
